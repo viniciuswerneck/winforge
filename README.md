@@ -196,27 +196,44 @@ dotnet run
 
 ## 🤝 Contribuição
 
-Contribuições são bem-vindas! Siga os passos:
+Somos **open source** e todos são bem-vindos! 🎉
 
-1. Fork o projeto
-2. Crie sua branch: `git checkout -b feature/nova-funcionalidade`
-3. Commit suas mudanças: `git commit -m 'feat: adiciona nova funcionalidade'`
-4. Push para a branch: `git push origin feature/nova-funcionalidade`
-5. Abra um Pull Request
+Veja o guia completo em [CONTRIBUTING.md](CONTRIBUTING.md).
+
+**Formas de contribuir:**
+- Reportar bugs e sugerir funcionalidades via [issues](https://github.com/viniciuswerneck/winforge/issues)
+- Submeter Pull Requests com melhorias
+- Melhorar a documentação
+- Compartilhar o projeto
 
 ---
 
 ## 📄 Licença
 
-Distribuído sob licença MIT. Veja [LICENSE](LICENSE) para mais informações.
+Distribuído sob licença **MIT**. Veja [LICENSE](LICENSE) para mais informações.
+
+Você pode usar, copiar, modificar, distribuir e contribuir livremente.
 
 ---
 
 <div align="center">
+  <p>
+    <a href="https://github.com/viniciuswerneck/winforge/graphs/contributors">
+      <img src="https://img.shields.io/github/contributors/viniciuswerneck/winforge?style=flat" alt="Contribuidores" />
+    </a>
+    <a href="https://github.com/viniciuswerneck/winforge/issues">
+      <img src="https://img.shields.io/github/issues/viniciuswerneck/winforge?style=flat" alt="Issues" />
+    </a>
+    <a href="https://github.com/viniciuswerneck/winforge/stargazers">
+      <img src="https://img.shields.io/github/stars/viniciuswerneck/winforge?style=flat" alt="Estrelas" />
+    </a>
+  </p>
   <p>Desenvolvido por <a href="https://lab.werneck.dev.br/">Werneck Lab</a></p>
   <p>
     <a href="https://github.com/viniciuswerneck/winforge/issues">Reportar Bug</a>
     ·
     <a href="https://github.com/viniciuswerneck/winforge/issues">Sugerir Funcionalidade</a>
+    ·
+    <a href="CONTRIBUTING.md">Contribuir</a>
   </p>
 </div>
