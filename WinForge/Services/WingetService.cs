@@ -10,54 +10,84 @@ public partial class WingetService : IWingetService
 
     public async Task<List<PackageInfo>> GetInstalledPackagesAsync()
     {
-        var (_, output) = await RunWingetAsync("list --accept-source-agreements");
-        return ParseWingetListOutput(output, hasAvailable: false);
+        var (_, output) = await RunWingetAsync(["list", "--accept-source-agreements"]);
+        return ParseWingetListOutput(output);
     }
 
     public async Task<List<PackageInfo>> GetUpgradablePackagesAsync()
     {
-        var (_, output) = await RunWingetAsync("upgrade --accept-source-agreements");
-        return ParseWingetListOutput(output, hasAvailable: true);
+        var (_, output) = await RunWingetAsync(["upgrade", "--accept-source-agreements"]);
+        return ParseWingetListOutput(output);
     }
 
     public async Task<List<PackageInfo>> SearchPackagesAsync(string query)
     {
-        var (_, output) = await RunWingetAsync($"search \"{query}\" --accept-source-agreements");
-        return ParseWingetListOutput(output, hasAvailable: false);
+        var (_, output) = await RunWingetAsync(["search", query, "--accept-source-agreements"]);
+        return ParseWingetListOutput(output);
     }
 
     public async Task<(bool Success, string Output)> InstallPackageAsync(string packageId)
     {
-        var (exitCode, output) = await RunWingetAsync($"install --exact --id \"{packageId}\" --silent --force --disable-interactivity --accept-source-agreements --accept-package-agreements");
-        return (exitCode == 0 && (output.Contains("instalado com êxito") || output.Contains("successfully installed")), output);
+        ValidatePackageId(packageId);
+        var (exitCode, output) = await RunWingetAsync(
+        [
+            "install", "--exact", "--id", packageId,
+            "--silent", "--force", "--disable-interactivity",
+            "--accept-source-agreements", "--accept-package-agreements"
+        ]);
+        return (exitCode == 0, output);
     }
 
     public async Task<(bool Success, string Output)> UpgradePackageAsync(string packageId)
     {
-        var (exitCode, output) = await RunWingetAsync($"upgrade --exact --id \"{packageId}\" --silent --force --disable-interactivity --accept-source-agreements --accept-package-agreements");
+        ValidatePackageId(packageId);
+        var (exitCode, output) = await RunWingetAsync(
+        [
+            "upgrade", "--exact", "--id", packageId,
+            "--silent", "--force", "--disable-interactivity",
+            "--accept-source-agreements", "--accept-package-agreements"
+        ]);
         return (exitCode == 0, output);
     }
 
     public async Task<(bool Success, string Output)> UpgradeAllAsync()
     {
-        var (exitCode, output) = await RunWingetAsync("upgrade --all --silent --force --disable-interactivity --accept-source-agreements --accept-package-agreements");
+        var (exitCode, output) = await RunWingetAsync(
+        [
+            "upgrade", "--all",
+            "--silent", "--force", "--disable-interactivity",
+            "--accept-source-agreements", "--accept-package-agreements"
+        ]);
         return (exitCode == 0, output);
     }
 
     public async Task<(bool Success, string Output)> UninstallPackageAsync(string packageId)
     {
-        var (exitCode, output) = await RunWingetAsync($"uninstall --exact --id \"{packageId}\" --silent --force --disable-interactivity --accept-source-agreements", 120000);
-        return (exitCode == 0 || output.Contains("desinstalado com êxito") || output.Contains("successfully uninstalled") || output.Contains("desinstalação concluída"), output);
+        ValidatePackageId(packageId);
+        var (exitCode, output) = await RunWingetAsync(
+        [
+            "uninstall", "--exact", "--id", packageId,
+            "--silent", "--force", "--disable-interactivity",
+            "--accept-source-agreements"
+        ], 120000);
+        return (exitCode == 0, output);
     }
 
-    private static async Task<(int ExitCode, string Output)> RunWingetAsync(string arguments, int timeoutMs = 120000)
+    private static void ValidatePackageId(string packageId)
+    {
+        if (string.IsNullOrWhiteSpace(packageId))
+            throw new ArgumentException("Package ID cannot be empty");
+        if (!PackageIdPattern().IsMatch(packageId))
+            throw new ArgumentException($"Package ID '{packageId}' contains invalid characters");
+    }
+
+    private static async Task<(int ExitCode, string Output)> RunWingetAsync(string[] arguments, int timeoutMs = 120000)
     {
         using var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
                 FileName = WingetExe,
-                Arguments = arguments,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -67,116 +97,113 @@ public partial class WingetService : IWingetService
             }
         };
 
+        foreach (var arg in arguments)
+            process.StartInfo.ArgumentList.Add(arg);
+
         process.Start();
 
         var readStdout = process.StandardOutput.ReadToEndAsync();
         var readStderr = process.StandardError.ReadToEndAsync();
 
-        // Wait for process to exit (or timeout)
         if (await Task.WhenAny(readStdout, Task.Delay(timeoutMs)) != readStdout)
         {
-            process.Kill();
+            try { process.Kill(); } catch { }
             var partialOut = await readStdout;
-            var partialErr = readStderr.IsCompleted ? await readStderr : "";
+            var partialErr = readStderr.IsCompletedSuccessfully ? await readStderr : "";
             return (-1, partialOut + partialErr + "\n[TIMEOUT]");
         }
 
         var output = await readStdout;
-        var error = readStderr.IsCompleted ? await readStderr : "";
+        var error = readStderr.IsCompletedSuccessfully ? await readStderr : "";
         process.WaitForExit();
 
         return (process.ExitCode, output + error);
     }
 
-    private static List<PackageInfo> ParseWingetListOutput(string output, bool hasAvailable)
+    private static List<PackageInfo> ParseWingetListOutput(string output)
     {
         var packages = new List<PackageInfo>();
-        var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var lines = output.Split(['\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
 
-        bool headerFound = false;
-        foreach (var line in lines)
+        int separatorIdx = -1;
+        for (int i = 0; i < lines.Length; i++)
         {
-            var trimmed = line.Trim();
+            var trimmed = lines[i].Trim();
             if (trimmed.StartsWith("---") || trimmed.StartsWith("─"))
             {
-                headerFound = true;
-                continue;
+                separatorIdx = i;
+                break;
             }
+        }
 
-            if (!headerFound || string.IsNullOrWhiteSpace(trimmed))
+        if (separatorIdx < 1)
+            return packages;
+
+        var header = lines[separatorIdx - 1];
+        var colNames = new[] { "Name", "Id", "Version", "Available", "Source" };
+        var colStarts = new List<(string Name, int Start)>();
+
+        foreach (var col in colNames)
+        {
+            int pos = header.IndexOf(col, StringComparison.OrdinalIgnoreCase);
+            if (pos >= 0)
+                colStarts.Add((col, pos));
+        }
+
+        if (colStarts.Count < 3)
+            return packages;
+
+        for (int i = separatorIdx + 1; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            if (string.IsNullOrWhiteSpace(line))
                 continue;
 
-            if (trimmed.Contains("Nenhum pacote") || trimmed.Contains("No package"))
+            if (line.Contains("Nenhum pacote") || line.Contains("No package"))
                 continue;
 
-            if (trimmed.StartsWith("Nome") || trimmed.StartsWith("Name"))
+            var name = ExtractColumn(line, colStarts, "Name");
+            var id = ExtractColumn(line, colStarts, "Id");
+            var version = ExtractColumn(line, colStarts, "Version");
+            var available = ExtractColumn(line, colStarts, "Available");
+            var source = ExtractColumn(line, colStarts, "Source");
+
+            if (string.IsNullOrWhiteSpace(id))
                 continue;
 
-            if (trimmed.Contains("marca d'água") || trimmed.Contains("watermark"))
-                continue;
-
-            var package = ParsePackageLine(trimmed, hasAvailable);
-            if (package != null && !string.IsNullOrWhiteSpace(package.Id))
-                packages.Add(package);
+            packages.Add(new PackageInfo
+            {
+                Name = name,
+                Id = id,
+                Version = version,
+                AvailableVersion = string.IsNullOrWhiteSpace(available) ? null : available,
+                Source = source
+            });
         }
 
         return packages;
     }
 
-    private static PackageInfo? ParsePackageLine(string line, bool hasAvailable)
+    private static string ExtractColumn(string line, List<(string Name, int Start)> colStarts, string colName)
     {
-        try
+        for (int i = 0; i < colStarts.Count; i++)
         {
-            var parts = SplitLinePreservingSpaces(line);
-            if (parts.Count < 3)
-                return null;
+            if (colStarts[i].Name != colName)
+                continue;
 
-            var name = parts[0];
-            var id = parts[1];
-            var version = parts[2];
-            string? availableVersion = null;
-            var source = string.Empty;
+            int start = colStarts[i].Start;
+            if (start >= line.Length)
+                return string.Empty;
 
-            // hasAvailable: columns are Name, Id, Version, Available, Source
-            // no available:  columns are Name, Id, Version, Source
-            if (hasAvailable)
-            {
-                if (parts.Count >= 4) availableVersion = parts[3];
-                if (parts.Count >= 5) source = parts[4];
-            }
-            else
-            {
-                if (parts.Count >= 4) source = parts[3];
-            }
+            int end = (i + 1 < colStarts.Count) ? colStarts[i + 1].Start : line.Length;
+            end = Math.Min(end, line.Length);
 
-            return new PackageInfo
-            {
-                Name = name.Trim(),
-                Id = id.Trim(),
-                Version = version.Trim(),
-                AvailableVersion = availableVersion?.Trim(),
-                Source = source.Trim()
-            };
+            return line.Substring(start, end - start).Trim();
         }
-        catch
-        {
-            return null;
-        }
+
+        return string.Empty;
     }
 
-    private static List<string> SplitLinePreservingSpaces(string line)
-    {
-        var parts = new List<string>();
-        var matches = PackageColumnPattern().Matches(line);
-
-        foreach (Match match in matches)
-        {
-            parts.Add(match.Value.Trim());
-        }
-
-        return parts;
-    }
-
-    [GeneratedRegex(@"\S+(\s+\S+)*?(?=\s{2,}|\n|$)", RegexOptions.Multiline)]
-    private static partial Regex PackageColumnPattern();
+    [GeneratedRegex(@"^[A-Za-z0-9._+\- ]+$")]
+    private static partial Regex PackageIdPattern();
 }

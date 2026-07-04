@@ -7,7 +7,7 @@ namespace WinForge.Services;
 
 public enum AppTheme { Dark, Light }
 
-public class ThemeService
+public class ThemeService : IThemeService
 {
     private AppTheme _currentTheme = AppTheme.Dark;
     private ResourceDictionary? _currentThemeDict;
@@ -48,8 +48,10 @@ public class ThemeService
         if (hwnd == IntPtr.Zero) return;
 
         var attr = dark ? 1 : 0;
-        DwmSetWindowAttribute(hwnd, 20, ref attr, Marshal.SizeOf<int>());
+        DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref attr, Marshal.SizeOf<int>());
     }
+
+    private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);

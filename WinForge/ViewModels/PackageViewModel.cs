@@ -29,14 +29,18 @@ public partial class PackageViewModel : ObservableObject
 
     public string Initial => Name.Length > 0 ? Name[..1].ToUpper() : "?";
 
+    private string? _cachedColor;
+
     public string InitialColor
     {
         get
         {
+            if (_cachedColor is not null) return _cachedColor;
             uint hash = 2166136261;
             foreach (char c in Name)
                 hash = (hash ^ c) * 16777619;
-            return Colors[hash % (uint)Colors.Length];
+            _cachedColor = Colors[hash % (uint)Colors.Length];
+            return _cachedColor;
         }
     }
 

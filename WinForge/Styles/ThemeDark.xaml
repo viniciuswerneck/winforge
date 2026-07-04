@@ -28,6 +28,11 @@
     <Color x:Key="ScrollbarThumbColor">#FF555555</Color>
     <Color x:Key="ScrollbarThumbHoverColor">#FF777777</Color>
     <Color x:Key="ScrollbarTrackColor">#FF222222</Color>
+    <Color x:Key="AccentBlue">#FF60B0FF</Color>
+    <Color x:Key="AccentOrange">#FFF0A030</Color>
+    <Color x:Key="AccentGreen">#FF4CCB70</Color>
+    <Color x:Key="AccentPurple">#FFBE70FF</Color>
+    <Color x:Key="AccentRed">#FFE04343</Color>
 
     <!-- Brushes -->
     <SolidColorBrush x:Key="ApplicationBackgroundBrush" Color="{StaticResource ApplicationBackgroundColor}" />

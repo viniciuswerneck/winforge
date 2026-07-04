@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Windows;
-using System.Windows.Documents;
 using System.Windows.Navigation;
 using WinForge.Services;
 using WinForge.ViewModels;
@@ -14,6 +13,14 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = viewModel;
 
+        if (Application.Current is App app)
+        {
+            app.ThemeService.ThemeChanged += theme =>
+            {
+                ThemeService.SetWindowTitleBarDark(this, theme == AppTheme.Dark);
+            };
+        }
+
         Loaded += (_, _) =>
         {
             ThemeService.SetWindowTitleBarDark(this, viewModel.IsDarkTheme);
@@ -21,8 +28,9 @@ public partial class MainWindow : Window
 
         Loaded += async (_, _) =>
         {
-            await viewModel.LoadInstalledCommand.ExecuteAsync(null);
-            await viewModel.LoadUpdatesCommand.ExecuteAsync(null);
+            await Task.WhenAll(
+                viewModel.LoadInstalledCommand.ExecuteAsync(null),
+                viewModel.LoadUpdatesCommand.ExecuteAsync(null));
         };
     }
 

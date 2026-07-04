@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Reflection;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -11,7 +10,9 @@ namespace WinForge.ViewModels;
 public partial class MainViewModel : ObservableObject
 {
     private readonly IWingetService _wingetService;
-    private readonly ThemeService _themeService;
+    private readonly IThemeService _themeService;
+    private readonly IUserConfigurationService _userConfigService;
+    private readonly SemaphoreSlim _operationGate = new(1, 1);
     private CancellationTokenSource? _searchDebounceCts;
 
     [ObservableProperty]
@@ -103,60 +104,35 @@ public partial class MainViewModel : ObservableObject
     {
         get
         {
-            var v = Assembly.GetExecutingAssembly().GetName().Version;
+            var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
             return v is not null ? $"v{v.Major}.{v.Minor}.{v.Build}" : "v1.0";
         }
     }
 
-    private static readonly string ConfigPath = System.IO.Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "WinForge", "config.json");
-
-    public MainViewModel(IWingetService wingetService, ThemeService themeService)
+    public MainViewModel(IWingetService wingetService, IThemeService themeService, IUserConfigurationService userConfigService)
     {
         _wingetService = wingetService;
         _themeService = themeService;
-        ShowOnboarding = !IsOnboardingCompleted();
-    }
-
-    private static bool IsOnboardingCompleted()
-    {
-        try
-        {
-            if (!System.IO.File.Exists(ConfigPath)) return false;
-            var json = System.IO.File.ReadAllText(ConfigPath);
-            return json.Contains("\"onboarding\":true");
-        }
-        catch { return false; }
-    }
-
-    private static void SetOnboardingCompleted()
-    {
-        try
-        {
-            var dir = System.IO.Path.GetDirectoryName(ConfigPath);
-            if (dir is not null) System.IO.Directory.CreateDirectory(dir);
-            System.IO.File.WriteAllText(ConfigPath, "{\"onboarding\":true}");
-        }
-        catch { }
+        _userConfigService = userConfigService;
+        ShowOnboarding = !_userConfigService.IsOnboardingCompleted();
     }
 
     [RelayCommand]
     private void DismissOnboarding()
     {
         ShowOnboarding = false;
-        SetOnboardingCompleted();
+        _userConfigService.SetOnboardingCompleted();
     }
 
     [RelayCommand]
     private async Task LoadInstalledAsync()
     {
-        if (IsBusy) return;
-        IsBusy = true;
-        StatusMessage = "Carregando pacotes instalados...";
-
+        await _operationGate.WaitAsync();
         try
         {
+            IsBusy = true;
+            StatusMessage = "Carregando pacotes instalados...";
+
             var packages = await _wingetService.GetInstalledPackagesAsync();
             _allInstalled = packages.Select(PackageViewModel.FromModel).ToList();
             TotalInstalledCount = _allInstalled.Count;
@@ -178,22 +154,22 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            _operationGate.Release();
         }
     }
 
     [RelayCommand]
     private async Task LoadUpdatesAsync()
     {
-        if (IsBusy) return;
-        IsBusy = true;
-        StatusMessage = "Verificando atualizações...";
-
+        await _operationGate.WaitAsync();
         try
         {
+            IsBusy = true;
+            StatusMessage = "Verificando atualizações...";
+
             var packages = await _wingetService.GetUpgradablePackagesAsync();
-            UpgradablePackages.Clear();
-            foreach (var pkg in packages)
-                UpgradablePackages.Add(PackageViewModel.FromModel(pkg));
+            UpgradablePackages = new ObservableCollection<PackageViewModel>(
+                packages.Select(PackageViewModel.FromModel));
             UpdatesCount = UpgradablePackages.Count;
             StatusMessage = UpdatesCount > 0
                 ? $"{UpdatesCount} atualizações disponíveis"
@@ -206,6 +182,7 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            _operationGate.Release();
         }
     }
 
@@ -213,16 +190,15 @@ public partial class MainViewModel : ObservableObject
     private async Task SearchPackagesAsync()
     {
         if (string.IsNullOrWhiteSpace(SearchQuery)) return;
-        if (IsBusy) return;
-        IsBusy = true;
-        StatusMessage = $"Buscando por '{SearchQuery}'...";
-
+        await _operationGate.WaitAsync();
         try
         {
+            IsBusy = true;
+            StatusMessage = $"Buscando por '{SearchQuery}'...";
+
             var results = await _wingetService.SearchPackagesAsync(SearchQuery);
-            SearchResults.Clear();
-            foreach (var pkg in results)
-                SearchResults.Add(PackageViewModel.FromModel(pkg));
+            SearchResults = new ObservableCollection<PackageViewModel>(
+                results.Select(PackageViewModel.FromModel));
             SearchResultsCount = SearchResults.Count;
             StatusMessage = $"{SearchResultsCount} resultados encontrados";
         }
@@ -233,6 +209,7 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            _operationGate.Release();
         }
     }
 
@@ -240,12 +217,14 @@ public partial class MainViewModel : ObservableObject
     private async Task InstallPackageAsync(PackageViewModel? package)
     {
         if (package == null || package.IsBusy) return;
+        await _operationGate.WaitAsync();
         package.IsBusy = true;
-        StatusMessage = $"Instalando {package.Id}...";
-
         try
         {
-            var (success, output) = await _wingetService.InstallPackageAsync(package.Id);
+            IsBusy = true;
+            StatusMessage = $"Instalando {package.Id}...";
+
+            var (success, _) = await _wingetService.InstallPackageAsync(package.Id);
             StatusMessage = success
                 ? $"{package.Name} instalado com sucesso"
                 : $"Falha ao instalar {package.Name}";
@@ -253,7 +232,9 @@ public partial class MainViewModel : ObservableObject
             if (success)
             {
                 SearchResults.Remove(package);
-                await LoadInstalledAsync();
+                _allInstalled.Add(package);
+                TotalInstalledCount = _allInstalled.Count;
+                ApplyInstalledFilter();
             }
         }
         catch (Exception ex)
@@ -263,6 +244,8 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             package.IsBusy = false;
+            IsBusy = false;
+            _operationGate.Release();
         }
     }
 
@@ -270,11 +253,13 @@ public partial class MainViewModel : ObservableObject
     private async Task UpgradePackageAsync(PackageViewModel? package)
     {
         if (package == null || package.IsBusy) return;
+        await _operationGate.WaitAsync();
         package.IsBusy = true;
-        StatusMessage = $"Atualizando {package.Id}...";
-
         try
         {
+            IsBusy = true;
+            StatusMessage = $"Atualizando {package.Id}...";
+
             var (success, _) = await _wingetService.UpgradePackageAsync(package.Id);
             StatusMessage = success
                 ? $"{package.Name} atualizado com sucesso"
@@ -284,7 +269,10 @@ public partial class MainViewModel : ObservableObject
             {
                 UpgradablePackages.Remove(package);
                 UpdatesCount = UpgradablePackages.Count;
-                await LoadInstalledAsync();
+                // Update version in installed list optimistically
+                var installed = _allInstalled.FirstOrDefault(p => p.Id == package.Id);
+                if (installed is not null)
+                    installed.Version = package.AvailableVersion ?? installed.Version;
             }
         }
         catch (Exception ex)
@@ -294,19 +282,21 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             package.IsBusy = false;
+            IsBusy = false;
+            _operationGate.Release();
         }
     }
 
     [RelayCommand]
     private async Task UpgradeAllAsync()
     {
-        if (IsBusy || UpgradablePackages.Count == 0) return;
-        IsBusy = true;
-        StatusMessage = "Atualizando todos os pacotes...";
-
+        await _operationGate.WaitAsync();
         try
         {
-            var (success, output) = await _wingetService.UpgradeAllAsync();
+            IsBusy = true;
+            StatusMessage = "Atualizando todos os pacotes...";
+
+            var (success, _) = await _wingetService.UpgradeAllAsync();
             StatusMessage = success
                 ? "Todos os pacotes foram atualizados"
                 : "Algumas atualizações falharam";
@@ -323,6 +313,7 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            _operationGate.Release();
         }
     }
 
@@ -330,11 +321,13 @@ public partial class MainViewModel : ObservableObject
     private async Task UninstallPackageAsync(PackageViewModel? package)
     {
         if (package == null || package.IsBusy) return;
+        await _operationGate.WaitAsync();
         package.IsBusy = true;
-        StatusMessage = $"Removendo {package.Id}...";
-
         try
         {
+            IsBusy = true;
+            StatusMessage = $"Removendo {package.Id}...";
+
             var (success, _) = await _wingetService.UninstallPackageAsync(package.Id);
             StatusMessage = success
                 ? $"{package.Name} removido com sucesso"
@@ -354,6 +347,8 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             package.IsBusy = false;
+            IsBusy = false;
+            _operationGate.Release();
         }
     }
 
@@ -381,9 +376,7 @@ public partial class MainViewModel : ObservableObject
                 string.Equals(p.Source, SelectedSourceFilter, StringComparison.OrdinalIgnoreCase));
         }
 
-        InstalledPackages.Clear();
-        foreach (var pkg in filtered)
-            InstalledPackages.Add(pkg);
+        InstalledPackages = new ObservableCollection<PackageViewModel>(filtered);
         InstalledCount = InstalledPackages.Count;
     }
 
@@ -400,6 +393,7 @@ public partial class MainViewModel : ObservableObject
     partial void OnSearchQueryChanged(string value)
     {
         _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
 
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -428,6 +422,13 @@ public partial class MainViewModel : ObservableObject
                 }
             }
             catch (TaskCanceledException) { }
+            catch (Exception ex)
+            {
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    StatusMessage = $"Erro na busca: {ex.Message}";
+                });
+            }
         }, token);
     }
 
@@ -436,6 +437,7 @@ public partial class MainViewModel : ObservableObject
     {
         SearchQuery = string.Empty;
         _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
     }
 
     [RelayCommand]
@@ -443,7 +445,5 @@ public partial class MainViewModel : ObservableObject
     {
         IsDarkTheme = !IsDarkTheme;
         _themeService.ToggleTheme();
-        if (App.Current.MainWindow is Window w)
-            ThemeService.SetWindowTitleBarDark(w, IsDarkTheme);
     }
 }

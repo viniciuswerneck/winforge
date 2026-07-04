@@ -1,11 +1,11 @@
 namespace WinForge.Models;
 
-public class PackageInfo
+public record PackageInfo
 {
-    public string Name { get; set; } = string.Empty;
-    public string Id { get; set; } = string.Empty;
-    public string Version { get; set; } = string.Empty;
-    public string? AvailableVersion { get; set; }
-    public string Source { get; set; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public string Id { get; init; } = string.Empty;
+    public string Version { get; init; } = string.Empty;
+    public string? AvailableVersion { get; init; }
+    public string Source { get; init; } = string.Empty;
     public bool HasUpdate => !string.IsNullOrEmpty(AvailableVersion);
 }
