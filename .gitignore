@@ -1,6 +1,10 @@
 ## .NET
 bin/
 obj/
+output/
+
+## Agent data
+.mimocode/
 *.user
 *.suo
 *.userosscache
