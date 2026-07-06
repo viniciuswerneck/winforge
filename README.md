@@ -5,47 +5,56 @@
   <p>
     <img src="https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet" alt=".NET 9" />
     <img src="https://img.shields.io/badge/WPF-net9.0--windows-512BD4?logo=windows" alt="WPF" />
-    <img src="https://img.shields.io/github/v/tag/viniciuswerneck/winforge?label=versão" alt="Version" />
     <img src="https://img.shields.io/badge/licença-MIT-green" alt="License" />
   </p>
+  <br/>
+  <a href="https://github.com/viniciuswerneck/winforge/releases/latest/download/WinForge-Setup-1.0.0.0.exe">
+    <img src="https://img.shields.io/badge/Baixar-Instalador-blue?style=for-the-badge&logo=windows" alt="Baixar Instalador" />
+  </a>
 </div>
 
 ---
 
-## 📋 Sobre
+## Sobre
 
 **WinForge** é uma interface gráfica moderna para o [winget](https://learn.microsoft.com/pt-br/windows/package-manager/winget/) — o gerenciador de pacotes nativo do Windows. Construído com .NET 9 e WPF, o WinForge oferece uma experiência visual alinhada ao **Fluent Design do Windows 11**, permitindo que você gerencie aplicativos instalados, descubra novos pacotes e mantenha tudo atualizado sem precisar usar a linha de comando.
 
-### ✨ Funcionalidades
+### Funcionalidades
 
 | Funcionalidade | Descrição |
 |----------------|-----------|
-| **📦 Pacotes Instalados** | Lista todos os pacotes gerenciados pelo winget com busca em tempo real e filtro por repositório (winget / Microsoft Store) |
-| **🔍 Busca & Instalar** | Encontre pacotes na comunidade winget e Microsoft Store com busca automática enquanto digita (debounce 300ms) |
-| **⬆️ Atualizações** | Veja atualizações disponíveis e aplique-as individualmente ou em massa com um clique |
-| **🌓 Tema Escuro/Claro** | Alterna entre temas dark e light; detecta automaticamente o tema do Windows |
-| **⌨️ Atalhos de Teclado** | `Ctrl+F` busca, `Ctrl+L` recarrega lista, `Enter` confirma |
-| **👋 Onboarding** | Tela de boas-vindas na primeira execução explicando o funcionamento |
+| Pacotes Instalados | Lista todos os pacotes gerenciados pelo winget com busca em tempo real e filtro por repositório |
+| Busca & Instalar | Encontre pacotes na comunidade winget e Microsoft Store com busca automática enquanto digita |
+| Atualizações | Veja atualizações disponíveis e aplique-as individualmente ou em massa com um clique |
+| Tema Escuro/Claro | Alterna entre temas dark e light; detecta automaticamente o tema do Windows |
+| Atalhos de Teclado | `Ctrl+F` busca, `Ctrl+L` recarrega lista, `Enter` confirma |
+| Onboarding | Tela de boas-vindas na primeira execução explicando o funcionamento |
 
 ---
 
-## 🖼️ Capturas de Tela
+## Instalação
 
-| Tema Escuro | Tema Claro |
-|:-----------:|:----------:|
-| *(adicione aqui)* | *(adicione aqui)* |
+### Instalador Windows (recomendado)
 
----
+<a href="https://github.com/viniciuswerneck/winforge/releases/latest/download/WinForge-Setup-1.0.0.0.exe">
+  <img src="https://img.shields.io/badge/Baixar-WinForge--Setup--1.0.0.0.exe-blue?style=for-the-badge" alt="Baixar Instalador" />
+</a>
 
-## 🚀 Instalação
+1. Clique no botão acima para baixar o instalador
+2. Execute o arquivo `WinForge-Setup-1.0.0.0.exe`
+3. Siga as instruções na tela
+4. O WinForge será instalado em `%LOCALAPPDATA%\Programs\WinForge`
+5. Um atalho será criado no Menu Iniciar
+
+> O instalador verifica automaticamente se o .NET 9 Desktop Runtime está instalado. Se não estiver, ele exibe um aviso com o link para download.
 
 ### Pré-requisitos
 
 - **Windows 10** (build 17763+) ou **Windows 11**
 - **winget** — já incluso no Windows 11 e no App Installer do Windows 10
-- **.NET 9 Runtime** — [baixar aqui](https://dotnet.microsoft.com/download/dotnet/9.0)
+- **.NET 9 Desktop Runtime** — [baixar aqui](https://dotnet.microsoft.com/download/dotnet/9.0)
 
-### Via GitHub (recomendado)
+### Via linha de comando
 
 ```powershell
 # Clone o repositório
@@ -71,7 +80,7 @@ Start-Process -WindowStyle Normal -FilePath "dotnet" -ArgumentList "run --projec
 
 ---
 
-## 🎮 Como Usar
+## Como Usar
 
 ### Primeira execução
 
@@ -106,7 +115,7 @@ Ao abrir o WinForge pela primeira vez, uma tela de **onboarding** apresenta as p
 
 ---
 
-## 🏗️ Arquitetura
+## Arquitetura
 
 ```
 WinForge/
@@ -126,6 +135,9 @@ WinForge/
 ├── Styles/
 │   ├── ThemeDark.xaml          # Recursos do tema escuro
 │   └── ThemeLight.xaml         # Recursos do tema claro
+├── Installer/
+│   ├── build-installer.ps1     # Script de build do instalador
+│   └── WinForge Setup.iss      # Script Inno Setup
 ├── App.xaml / App.xaml.cs      # Ponto de entrada, DI manual
 ├── MainWindow.xaml / .cs       # Interface principal
 └── WinForge.csproj             # .NET 9, WPF, CommunityToolkit.Mvvm
@@ -138,7 +150,8 @@ WinForge/
 | .NET | 9.0 |
 | WPF | net9.0-windows |
 | CommunityToolkit.Mvvm | 8.4.0 |
-| winget | ≥ 1.29 |
+| winget | >= 1.29 |
+| Inno Setup | 6+ |
 
 ### Padrões
 
@@ -150,53 +163,36 @@ WinForge/
 
 ---
 
-## ⚙️ Integração com winget
-
-O WinForge executa o winget nos bastidores com os seguintes parâmetros:
-
-| Operação | Comando |
-|----------|---------|
-| Listar instalados | `winget list --accept-source-agreements` |
-| Buscar pacotes | `winget search <query> --accept-source-agreements` |
-| Instalar | `winget install --exact --id <id> --silent --force --disable-interactivity --accept-source-agreements --accept-package-agreements` |
-| Atualizar | `winget upgrade --exact --id <id> --silent --force --disable-interactivity --accept-source-agreements --accept-package-agreements` |
-| Atualizar todos | `winget upgrade --all --silent --force --disable-interactivity --accept-source-agreements --accept-package-agreements` |
-| Desinstalar | `winget uninstall --exact --id <id> --silent --force --disable-interactivity --accept-source-agreements` |
-
-> Todos os comandos utilizam `--silent --force --disable-interactivity` para evitar bloqueios por diálogos do instalador.
-
----
-
-## 🧪 Compilação do Zero
+## Compilando o Instalador
 
 ```powershell
-# Requer .NET 9 SDK
-dotnet new wpf -n WinForge
-cd WinForge
-dotnet add package CommunityToolkit.Mvvm --version 8.4.0
-# Copie os arquivos do repositório
-dotnet build
-dotnet run
+# Requer .NET 9 SDK e Inno Setup 6+
+.\Installer\build-installer.ps1
+
+# Modo self-contained (inclui .NET 9 Runtime, ~80MB)
+.\Installer\build-installer.ps1 -SelfContained
 ```
 
----
-
-## 🗺️ Roadmap
-
-- [ ] **Painel de detalhes** do pacote (descrição, homepage, licença)
-- [ ] **Operações em lote** com checkboxes
-- [ ] **Exportar/Importar** lista de pacotes (JSON)
-- [ ] **Minimizar para bandeja** com notificação de atualizações
-- [ ] **Ordenação** por nome/versão/source
-- [ ] **Modo compacto** de visualização
-- [ ] **Animações** fade/slide nos cards
-- [ ] **Menu de contexto** (Copiar ID, Abrir Homepage)
+O instalador será gerado em `WinForge/output/WinForge-Setup-1.0.0.0.exe`.
 
 ---
 
-## 🤝 Contribuição
+## Roadmap
 
-Somos **open source** e todos são bem-vindos! 🎉
+- Painel de detalhes do pacote (descrição, homepage, licença)
+- Operações em lote com checkboxes
+- Exportar/Importar lista de pacotes (JSON)
+- Minimizar para bandeja com notificação de atualizações
+- Ordenação por nome/versão/source
+- Modo compacto de visualização
+- Animações fade/slide nos cards
+- Menu de contexto (Copiar ID, Abrir Homepage)
+
+---
+
+## Contribuição
+
+Somos **open source** e todos são bem-vindos!
 
 Veja o guia completo em [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -208,7 +204,7 @@ Veja o guia completo em [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
-## 📄 Licença
+## Licença
 
 Distribuído sob licença **MIT**. Veja [LICENSE](LICENSE) para mais informações.
 
