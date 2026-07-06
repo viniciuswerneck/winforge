@@ -13,7 +13,6 @@ public partial class MainViewModel : ObservableObject
     private readonly IThemeService _themeService;
     private readonly IUserConfigurationService _userConfigService;
     private readonly SemaphoreSlim _operationGate = new(1, 1);
-    private CancellationTokenSource? _searchDebounceCts;
 
     [ObservableProperty]
     private ObservableCollection<PackageViewModel> _installedPackages = [];
@@ -83,6 +82,30 @@ public partial class MainViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasSearchResults))]
     [NotifyPropertyChangedFor(nameof(HasNoSearchResults))]
     private int _searchResultsCount;
+
+    [ObservableProperty]
+    private ObservableCollection<UpgradeResult> _batchResults = [];
+
+    [ObservableProperty]
+    private bool _isBatchUpgrading;
+
+    [ObservableProperty]
+    private bool _hasBatchResults;
+
+    [ObservableProperty]
+    private int _batchCurrentIndex;
+
+    [ObservableProperty]
+    private int _batchTotal;
+
+    [ObservableProperty]
+    private bool _showPackageInfo;
+
+    [ObservableProperty]
+    private string _packageInfoTitle = string.Empty;
+
+    [ObservableProperty]
+    private string _packageInfoDetails = string.Empty;
 
     public bool HasInstalledPackages => InstalledCount > 0;
 
@@ -260,7 +283,7 @@ public partial class MainViewModel : ObservableObject
             IsBusy = true;
             StatusMessage = $"Atualizando {package.Id}...";
 
-            var (success, _) = await _wingetService.UpgradePackageAsync(package.Id);
+            var (success, output) = await _wingetService.UpgradePackageAsync(package.Id);
             StatusMessage = success
                 ? $"{package.Name} atualizado com sucesso"
                 : $"Falha ao atualizar {package.Name}";
@@ -269,7 +292,6 @@ public partial class MainViewModel : ObservableObject
             {
                 UpgradablePackages.Remove(package);
                 UpdatesCount = UpgradablePackages.Count;
-                // Update version in installed list optimistically
                 var installed = _allInstalled.FirstOrDefault(p => p.Id == package.Id);
                 if (installed is not null)
                     installed.Version = package.AvailableVersion ?? installed.Version;
@@ -293,18 +315,55 @@ public partial class MainViewModel : ObservableObject
         await _operationGate.WaitAsync();
         try
         {
-            IsBusy = true;
-            StatusMessage = "Atualizando todos os pacotes...";
+            var packages = UpgradablePackages.ToList();
+            if (packages.Count == 0) return;
 
-            var (success, _) = await _wingetService.UpgradeAllAsync();
-            StatusMessage = success
-                ? "Todos os pacotes foram atualizados"
-                : "Algumas atualizações falharam";
+            BatchResults.Clear();
+            foreach (var p in packages)
+                BatchResults.Add(new UpgradeResult { Name = p.Name, Id = p.Id, Status = UpgradeStatus.Pending });
+            IsBatchUpgrading = true;
+            BatchTotal = packages.Count;
+            HasBatchResults = true;
 
-            UpgradablePackages.Clear();
-            UpdatesCount = 0;
-            await LoadInstalledAsync();
-            await LoadUpdatesAsync();
+            int successCount = 0;
+            int failCount = 0;
+
+            for (int i = 0; i < packages.Count; i++)
+            {
+                var pkg = packages[i];
+                BatchCurrentIndex = i + 1;
+                StatusMessage = $"[{i + 1}/{packages.Count}] Atualizando {pkg.Name}...";
+
+                BatchResults[i].Status = UpgradeStatus.InProgress;
+
+                var (success, output) = await _wingetService.UpgradePackageAsync(pkg.Id);
+
+                if (!success && IsHashMismatch(output))
+                {
+                    StatusMessage = $"[{i + 1}/{packages.Count}] {pkg.Name}: hash incompatível, tentando forçar...";
+                    (success, output) = await _wingetService.UpgradePackageForceHashAsync(pkg.Id);
+                }
+
+                if (success)
+                {
+                    BatchResults[i].Status = UpgradeStatus.Success;
+                    successCount++;
+                    UpgradablePackages.Remove(pkg);
+                    var installed = _allInstalled.FirstOrDefault(p => p.Id == pkg.Id);
+                    if (installed is not null)
+                        installed.Version = pkg.AvailableVersion ?? installed.Version;
+                }
+                else
+                {
+                    BatchResults[i].Status = UpgradeStatus.Failed;
+                    var reason = ExtractFailureReason(output);
+                    BatchResults[i].ErrorMessage = reason;
+                    failCount++;
+                }
+            }
+
+            UpdatesCount = UpgradablePackages.Count;
+            StatusMessage = $"Concluído: {successCount} atualizado(s), {failCount} falha(s)";
         }
         catch (Exception ex)
         {
@@ -312,9 +371,17 @@ public partial class MainViewModel : ObservableObject
         }
         finally
         {
-            IsBusy = false;
+            IsBatchUpgrading = false;
             _operationGate.Release();
         }
+    }
+
+    [RelayCommand]
+    private void DismissBatchResults()
+    {
+        BatchResults.Clear();
+        IsBatchUpgrading = false;
+        HasBatchResults = false;
     }
 
     [RelayCommand]
@@ -392,52 +459,18 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnSearchQueryChanged(string value)
     {
-        _searchDebounceCts?.Cancel();
-        _searchDebounceCts?.Dispose();
-
         if (string.IsNullOrWhiteSpace(value))
         {
             SearchResults.Clear();
             SearchResultsCount = 0;
             StatusMessage = "Pronto";
-            return;
         }
-
-        var cts = new CancellationTokenSource();
-        _searchDebounceCts = cts;
-        var token = cts.Token;
-
-        Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(300, token);
-                if (!token.IsCancellationRequested)
-                {
-                    await Application.Current.Dispatcher.InvokeAsync(async () =>
-                    {
-                        if (!string.IsNullOrWhiteSpace(SearchQuery))
-                            await SearchPackagesAsync();
-                    });
-                }
-            }
-            catch (TaskCanceledException) { }
-            catch (Exception ex)
-            {
-                await Application.Current.Dispatcher.InvokeAsync(() =>
-                {
-                    StatusMessage = $"Erro na busca: {ex.Message}";
-                });
-            }
-        }, token);
     }
 
     [RelayCommand]
     private void ClearSearch()
     {
         SearchQuery = string.Empty;
-        _searchDebounceCts?.Cancel();
-        _searchDebounceCts?.Dispose();
     }
 
     [RelayCommand]
@@ -445,5 +478,79 @@ public partial class MainViewModel : ObservableObject
     {
         IsDarkTheme = !IsDarkTheme;
         _themeService.ToggleTheme();
+    }
+
+    [RelayCommand]
+    private async Task ShowPackageInfoAsync(PackageViewModel? package)
+    {
+        if (package == null) return;
+        try
+        {
+            PackageInfoTitle = package.Name;
+            PackageInfoDetails = "Carregando informações...";
+            ShowPackageInfo = true;
+
+            var details = await _wingetService.GetPackageDetailsAsync(package.Id);
+            PackageInfoDetails = FormatPackageInfo(details);
+        }
+        catch (Exception ex)
+        {
+            PackageInfoDetails = $"Erro ao buscar informações: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void DismissPackageInfo()
+    {
+        ShowPackageInfo = false;
+    }
+
+    private static string FormatPackageInfo(string raw)
+    {
+        var lines = raw.Split(['\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
+        var result = new List<string>();
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+            if (string.IsNullOrEmpty(trimmed)) continue;
+            if (trimmed.StartsWith("---")) continue;
+            result.Add(trimmed);
+        }
+        return string.Join("\n", result);
+    }
+
+    private static string ExtractFailureReason(string output)
+    {
+        var lower = output.ToLowerInvariant();
+
+        if (lower.Contains("hash do instalador não corresponde") || lower.Contains("installer hash does not match"))
+            return "Hash do instalador desatualizado no manifesto winget";
+        if (lower.Contains("privilégios de administrador") || lower.Contains("administrator privileges") || lower.Contains("0x80073d28"))
+            return "Necessita executar como administrador";
+        if (lower.Contains("nenhuma atualização disponível") || lower.Contains("no update was found"))
+            return "Nenhuma atualização disponível";
+        if (lower.Contains("no applicable update") || lower.Contains("nenhuma versão de pacote"))
+            return "Nenhuma versão compatível";
+        if (lower.Contains("nenhum pacote instalado") || lower.Contains("no installed package"))
+            return "Pacote não reconhecido pelo winget";
+        if (lower.Contains("an error occurred") || lower.Contains("ocorreu um erro"))
+            return "Erro durante a operação";
+
+        var lines = output.Split(['\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+            if (trimmed.Length > 0 && trimmed.Length < 120 && !trimmed.StartsWith("---"))
+                return trimmed;
+        }
+
+        return "Erro desconhecido";
+    }
+
+    private static bool IsHashMismatch(string output)
+    {
+        var lower = output.ToLowerInvariant();
+        return lower.Contains("hash do instalador não corresponde")
+            || lower.Contains("installer hash does not match");
     }
 }

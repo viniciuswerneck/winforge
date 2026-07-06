@@ -35,7 +35,7 @@ public partial class WingetService : IWingetService
             "--silent", "--force", "--disable-interactivity",
             "--accept-source-agreements", "--accept-package-agreements"
         ]);
-        return (exitCode == 0, output);
+        return (IsSuccess(exitCode, output), output);
     }
 
     public async Task<(bool Success, string Output)> UpgradePackageAsync(string packageId)
@@ -47,7 +47,19 @@ public partial class WingetService : IWingetService
             "--silent", "--force", "--disable-interactivity",
             "--accept-source-agreements", "--accept-package-agreements"
         ]);
-        return (exitCode == 0, output);
+        return (IsSuccess(exitCode, output), output);
+    }
+
+    public async Task<(bool Success, string Output)> UpgradePackageForceHashAsync(string packageId)
+    {
+        ValidatePackageId(packageId);
+        var (exitCode, output) = await RunWingetAsync(
+        [
+            "upgrade", "--exact", "--id", packageId,
+            "--silent", "--force", "--ignore-security-hash", "--disable-interactivity",
+            "--accept-source-agreements", "--accept-package-agreements"
+        ]);
+        return (IsSuccess(exitCode, output), output);
     }
 
     public async Task<(bool Success, string Output)> UpgradeAllAsync()
@@ -57,8 +69,8 @@ public partial class WingetService : IWingetService
             "upgrade", "--all",
             "--silent", "--force", "--disable-interactivity",
             "--accept-source-agreements", "--accept-package-agreements"
-        ]);
-        return (exitCode == 0, output);
+        ], 600000);
+        return (IsSuccess(exitCode, output), output);
     }
 
     public async Task<(bool Success, string Output)> UninstallPackageAsync(string packageId)
@@ -70,7 +82,43 @@ public partial class WingetService : IWingetService
             "--silent", "--force", "--disable-interactivity",
             "--accept-source-agreements"
         ], 120000);
-        return (exitCode == 0, output);
+        return (IsSuccess(exitCode, output), output);
+    }
+
+    public async Task<string> GetPackageDetailsAsync(string packageId)
+    {
+        ValidatePackageId(packageId);
+        var (_, output) = await RunWingetAsync(
+        [
+            "show", "--exact", "--id", packageId,
+            "--accept-source-agreements"
+        ]);
+        return output;
+    }
+
+    private static bool IsSuccess(int exitCode, string output)
+    {
+        var lower = output.ToLowerInvariant();
+
+        if (lower.Contains("nenhuma atualização disponível")
+            || lower.Contains("no update was found")
+            || lower.Contains("no applicable update")
+            || lower.Contains("nenhuma versão de pacote")
+            || lower.Contains("hash do instalador não corresponde")
+            || lower.Contains("installer hash does not match")
+            || lower.Contains("an error occurred")
+            || lower.Contains("ocorreu um erro"))
+            return false;
+
+        if (exitCode == 0)
+            return true;
+
+        return lower.Contains("successfully installed")
+            || lower.Contains("instalado com sucesso")
+            || lower.Contains("successfully upgraded")
+            || lower.Contains("atualizado com sucesso")
+            || lower.Contains("successfully uninstalled")
+            || lower.Contains("desinstalado com sucesso");
     }
 
     private static void ValidatePackageId(string packageId)
@@ -105,20 +153,30 @@ public partial class WingetService : IWingetService
         var readStdout = process.StandardOutput.ReadToEndAsync();
         var readStderr = process.StandardError.ReadToEndAsync();
 
-        if (await Task.WhenAny(readStdout, Task.Delay(timeoutMs)) != readStdout)
+        var bothStreams = Task.WhenAll(readStdout, readStderr);
+        var completed = await Task.WhenAny(bothStreams, Task.Delay(timeoutMs));
+
+        if (completed != bothStreams)
         {
-            try { process.Kill(); } catch { }
-            var partialOut = await readStdout;
-            var partialErr = readStderr.IsCompletedSuccessfully ? await readStderr : "";
-            return (-1, partialOut + partialErr + "\n[TIMEOUT]");
+            try { process.Kill(true); } catch { }
+            try { await process.WaitForExitAsync(); } catch { }
+            return (-1, "[TIMEOUT]");
         }
 
-        var output = await readStdout;
-        var error = readStderr.IsCompletedSuccessfully ? await readStderr : "";
-        process.WaitForExit();
+        var stdout = await readStdout;
+        var stderr = await readStderr;
 
-        return (process.ExitCode, output + error);
+        return (process.ExitCode, stdout + stderr);
     }
+
+    private static readonly Dictionary<string, string[]> ColumnAliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Name"] = ["Name", "Nome"],
+        ["Id"] = ["Id", "ID"],
+        ["Version"] = ["Version", "Versão", "Versao"],
+        ["Available"] = ["Available", "Disponível", "Disponivel"],
+        ["Source"] = ["Source", "Origem"]
+    };
 
     private static List<PackageInfo> ParseWingetListOutput(string output)
     {
@@ -145,9 +203,18 @@ public partial class WingetService : IWingetService
 
         foreach (var col in colNames)
         {
-            int pos = header.IndexOf(col, StringComparison.OrdinalIgnoreCase);
-            if (pos >= 0)
-                colStarts.Add((col, pos));
+            if (!ColumnAliases.TryGetValue(col, out var aliases))
+                aliases = [col];
+
+            int bestPos = -1;
+            foreach (var alias in aliases)
+            {
+                int pos = header.IndexOf(alias, StringComparison.OrdinalIgnoreCase);
+                if (pos >= 0 && (bestPos < 0 || pos < bestPos))
+                    bestPos = pos;
+            }
+            if (bestPos >= 0)
+                colStarts.Add((col, bestPos));
         }
 
         if (colStarts.Count < 3)

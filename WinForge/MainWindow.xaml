@@ -9,6 +9,7 @@
         Icon="icon.ico"
         Height="760" Width="1100"
         MinHeight="500" MinWidth="800"
+        WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
         FontFamily="Segoe UI Variable, Segoe UI, sans-serif"
         TextElement.FontSize="13"
@@ -406,10 +407,19 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <Button Grid.Column="2" Content="Desinstalar" Style="{StaticResource DangerButton}"
-                                Command="{Binding DataContext.UninstallPackageCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
-                                CommandParameter="{Binding}" IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"
-                                Height="30" VerticalAlignment="Center" ToolTip="Remover este pacote do sistema" />
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                            <Button Content="ℹ" Style="{StaticResource IconButton}"
+                                    Command="{Binding DataContext.ShowPackageInfoCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                    CommandParameter="{Binding}"
+                                    Height="30" Width="32"
+                                    FontSize="14" ToolTip="Informações do pacote"
+                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                    Margin="0,0,4,0" />
+                            <Button Content="Desinstalar" Style="{StaticResource DangerButton}"
+                                    Command="{Binding DataContext.UninstallPackageCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                    CommandParameter="{Binding}" IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"
+                                    Height="30" VerticalAlignment="Center" ToolTip="Remover este pacote do sistema" />
+                        </StackPanel>
                     </Grid>
                 </Border>
             </DataTemplate>
@@ -459,10 +469,19 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <Button Grid.Column="2" Content="Instalar" Style="{StaticResource ActionButton}"
-                                Command="{Binding DataContext.InstallPackageCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
-                                CommandParameter="{Binding}" IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"
-                                Height="30" VerticalAlignment="Center" ToolTip="Instalar este pacote" />
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                            <Button Content="ℹ" Style="{StaticResource IconButton}"
+                                    Command="{Binding DataContext.ShowPackageInfoCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                    CommandParameter="{Binding}"
+                                    Height="30" Width="32"
+                                    FontSize="14" ToolTip="Informações do pacote"
+                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                    Margin="0,0,4,0" />
+                            <Button Content="Instalar" Style="{StaticResource ActionButton}"
+                                    Command="{Binding DataContext.InstallPackageCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                    CommandParameter="{Binding}" IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"
+                                    Height="30" VerticalAlignment="Center" ToolTip="Instalar este pacote" />
+                        </StackPanel>
                     </Grid>
                 </Border>
             </DataTemplate>
@@ -517,10 +536,19 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <Button Grid.Column="2" Content="Atualizar" Style="{StaticResource ActionButton}"
-                                Command="{Binding DataContext.UpgradePackageCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
-                                CommandParameter="{Binding}" IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"
-                                Height="30" VerticalAlignment="Center" ToolTip="Atualizar este pacote" />
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                            <Button Content="ℹ" Style="{StaticResource IconButton}"
+                                    Command="{Binding DataContext.ShowPackageInfoCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                    CommandParameter="{Binding}"
+                                    Height="30" Width="32"
+                                    FontSize="14" ToolTip="Informações do pacote"
+                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                    Margin="0,0,4,0" />
+                            <Button Content="Atualizar" Style="{StaticResource ActionButton}"
+                                    Command="{Binding DataContext.UpgradePackageCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                    CommandParameter="{Binding}" IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"
+                                    Height="30" VerticalAlignment="Center" ToolTip="Atualizar este pacote" />
+                        </StackPanel>
                     </Grid>
                 </Border>
             </DataTemplate>
@@ -628,12 +656,11 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <Grid Grid.Row="0" Margin="0,0,0,14">
+                            <Grid Grid.Row="0" Margin="0,0,0,14">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="160" />
-                                <ColumnDefinition Width="100" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0"
@@ -693,19 +720,7 @@
                                     </Button>
                                 </Grid>
                             </Border>
-                            <ComboBox Grid.Column="3"
-                                      ItemsSource="{Binding SourceFilters}"
-                                      SelectedItem="{Binding SelectedSourceFilter}"
-                                      FontSize="11.5"
-                                      Height="30"
-                                      VerticalAlignment="Center"
-                                      Margin="8,0,0,0"
-                                      Padding="6,1"
-                                      Background="{DynamicResource ControlFillColorDefaultBrush}"
-                                      Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                                      BorderBrush="{DynamicResource CardBorderBrush}"
-                                      BorderThickness="1" />
-                            <Border Grid.Column="4"
+                            <Border Grid.Column="3"
                                     Style="{StaticResource TagPill}"
                                     VerticalAlignment="Center"
                                     Margin="10,0,0,0">
@@ -814,6 +829,7 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0"
                                                Text="🔎"
@@ -868,8 +884,8 @@
                                         </TextBox.Style>
                                     </TextBox>
                                     <Button Grid.Column="2"
-                                            FontSize="12"
-                                            Width="28" Height="28"
+                                            FontSize="11"
+                                            Width="30" Height="28"
                                             Margin="0,0,4,0"
                                             ToolTip="Limpar"
                                             Visibility="{Binding SearchQuery, Converter={StaticResource StringNotEmpty}}"
@@ -886,6 +902,14 @@
                                             </Style>
                                         </Button.Style>
                                     </Button>
+                                    <Button Grid.Column="3"
+                                            Content="Buscar"
+                                            Style="{StaticResource ActionButton}"
+                                            Command="{Binding SearchPackagesCommand}"
+                                            Height="28"
+                                            Padding="14,0"
+                                            FontSize="11.5"
+                                            Margin="4,0,0,0" />
                                 </Grid>
                             </Border>
 
@@ -971,12 +995,152 @@
                                     Content="Atualizar Todos"
                                     Style="{StaticResource ActionButton}"
                                     Command="{Binding UpgradeAllCommand}"
+                                    IsEnabled="{Binding IsBatchUpgrading, Converter={StaticResource InverseBool}}"
                                     Height="34"
                                     Padding="18,6"
                                     FontSize="12" />
                         </Grid>
 
                         <Grid Grid.Row="1">
+                            <!-- Batch upgrade results -->
+                            <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    BorderBrush="{DynamicResource CardBorderBrush}"
+                                    CornerRadius="10"
+                                    Padding="20"
+                                    Visibility="{Binding HasBatchResults, Converter={StaticResource BoolToVis}}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Header -->
+                                    <TextBlock Grid.Row="0"
+                                               FontSize="15" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                               Margin="0,0,0,10">
+                                        <Run Text="Progresso da Atualização" />
+                                    </TextBlock>
+
+                                    <!-- Progress bar -->
+                                    <Grid Grid.Row="1" Margin="0,0,0,14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ProgressBar Height="6"
+                                                     Maximum="{Binding BatchTotal}"
+                                                     Value="{Binding BatchCurrentIndex}"
+                                                     Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                                                     Background="{DynamicResource ControlFillColorDefaultBrush}"
+                                                     BorderThickness="0" />
+                                        <TextBlock Grid.Column="1"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="10,0,0,0">
+                                            <Run Text="{Binding BatchCurrentIndex, Mode=OneWay}" />
+                                            <Run Text="/" />
+                                            <Run Text="{Binding BatchTotal, Mode=OneWay}" />
+                                        </TextBlock>
+                                    </Grid>
+
+                                    <!-- Results list -->
+                                    <ListBox Grid.Row="2"
+                                             ItemsSource="{Binding BatchResults}"
+                                             BorderThickness="0"
+                                             Background="Transparent"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             VirtualizingPanel.ScrollUnit="Pixel">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,0,0,6">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="22" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <TextBlock Grid.Column="0"
+                                                               VerticalAlignment="Center"
+                                                               FontSize="12">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Text" Value="⏳" />
+                                                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="InProgress">
+                                                                        <Setter Property="Text" Value="⚙️" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Success">
+                                                                        <Setter Property="Text" Value="✅" />
+                                                                        <Setter Property="Foreground" Value="{DynamicResource StatusSuccessBrush}" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Failed">
+                                                                        <Setter Property="Text" Value="❌" />
+                                                                        <Setter Property="Foreground" Value="{DynamicResource StatusErrorBrush}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Name}"
+                                                                   FontSize="12.5"
+                                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock FontSize="10.5"
+                                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                                   Visibility="{Binding ErrorMessage, Converter={StaticResource StringNotEmpty}}">
+                                                            <Run Text="{Binding ErrorMessage, Mode=OneWay}" />
+                                                        </TextBlock>
+                                                    </StackPanel>
+
+                                                    <TextBlock Grid.Column="2"
+                                                               FontSize="10.5"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Text" Value="Pendente" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="InProgress">
+                                                                        <Setter Property="Text" Value="Atualizando..." />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Success">
+                                                                        <Setter Property="Text" Value="OK" />
+                                                                        <Setter Property="Foreground" Value="{DynamicResource StatusSuccessBrush}" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Status}" Value="Failed">
+                                                                        <Setter Property="Text" Value="Falhou" />
+                                                                        <Setter Property="Foreground" Value="{DynamicResource StatusErrorBrush}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+
+                                    <!-- Close button -->
+                                    <Button Grid.Row="3"
+                                            Content="Fechar"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Command="{Binding DismissBatchResultsCommand}"
+                                            HorizontalAlignment="Right"
+                                            Margin="0,10,0,0"
+                                            Padding="16,6"
+                                            FontSize="12" />
+                                </Grid>
+                            </Border>
+
+                            <!-- Normal package list -->
                             <ListBox ItemsSource="{Binding UpgradablePackages}"
                                      SelectedItem="{Binding SelectedUpgradablePackage}"
                                      Style="{StaticResource CardListStyle}"
@@ -1211,6 +1375,64 @@
                              BorderThickness="0"
                              HorizontalAlignment="Center" />
             </StackPanel>
+        </Border>
+
+        <!-- ═══════ PACKAGE INFO OVERLAY ═══════ -->
+        <Border Grid.Row="0" Grid.RowSpan="3"
+                Background="#E0000000"
+                Visibility="{Binding ShowPackageInfo, Converter={StaticResource BoolToVis}}"
+                Panel.ZIndex="15">
+            <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    BorderThickness="1"
+                    BorderBrush="{DynamicResource CardBorderBrush}"
+                    CornerRadius="16"
+                    Padding="28,24"
+                    Width="520" MaxHeight="600"
+                    Effect="{DynamicResource CardShadowElevated}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
+                        <TextBlock Text="ℹ" FontSize="18" Margin="0,0,8,0"
+                                   Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding PackageInfoTitle}"
+                                   FontSize="16" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+
+                    <Border Grid.Row="1" Height="1"
+                            Background="{DynamicResource DividerBrush}" Margin="0,0,0,10" />
+
+                    <ScrollViewer Grid.Row="2"
+                                  VerticalScrollBarVisibility="Auto"
+                                  MaxHeight="420">
+                        <TextBlock Text="{Binding PackageInfoDetails}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   FontFamily="Cascadia Code, Consolas, monospace"
+                                   LineHeight="20" />
+                    </ScrollViewer>
+
+                    <Button Grid.Row="3"
+                            Content="Fechar"
+                            Style="{StaticResource SecondaryButton}"
+                            Command="{Binding DismissPackageInfoCommand}"
+                            HorizontalAlignment="Right"
+                            Margin="0,12,0,0"
+                            Padding="16,6"
+                            FontSize="12" />
+                </Grid>
+            </Border>
         </Border>
     </Grid>
 </Window>
